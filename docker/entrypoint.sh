@@ -25,6 +25,31 @@ MARKER="$BRAIN/brain/tools/serve.py"
 REPO="${BRAIN_REPO:-https://github.com/albertonoys/life-brain-starter}"
 REF="${BRAIN_REF:-master}"
 
+# Before anything: can we write here at all? The container runs as the UID it
+# was built with, and BRAIN_DIR is owned by whoever made it on the host — two
+# numbers set in two different places, with nothing keeping them in step. When
+# they disagree the symptom is a git error about .git, which says nothing about
+# the actual problem. So check first, and say both numbers out loud.
+if [ ! -w "$BRAIN" ]; then
+    ME="$(id -u):$(id -g)"
+    OWNER="$(stat -c '%u:%g' "$BRAIN" 2>/dev/null || echo 'unknown')"
+    echo "  Cannot write to /brain." >&2
+    echo "    this container runs as  $ME" >&2
+    echo "    the folder is owned by  $OWNER" >&2
+    if [ "$ME" = "$OWNER" ]; then
+        # Same user, still refused: the permission bits are the problem, and
+        # chown would be a confusing thing to be told to run here.
+        echo "  The owner is right, so it is the permissions:" >&2
+        echo "    $(stat -c '%A' "$BRAIN" 2>/dev/null)" >&2
+        echo "  On the server: chmod u+rwx <the folder BRAIN_DIR points at>" >&2
+    else
+        echo "  Those have to match. On the server, either:" >&2
+        echo "    sudo chown -R $ME <the folder BRAIN_DIR points at>" >&2
+        echo "  or rebuild the image with UID/GID set to $OWNER." >&2
+    fi
+    exit 1
+fi
+
 if [ -f "$MARKER" ]; then
     :                                   # a brain is already here
 elif [ -z "$(ls -A "$BRAIN" 2>/dev/null)" ]; then
