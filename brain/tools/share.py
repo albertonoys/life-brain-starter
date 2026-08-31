@@ -71,6 +71,15 @@ ROOT_FILES = [
     "Open Brain.command",
     "Set Up Mornings (Windows).bat",
     "Set Up Night Shift (Windows).bat",
+    # Running the brain on an always-on machine instead of a laptop. README.md
+    # has a section on it, so a package without these files would hand the
+    # friend instructions for files they do not have. .env is deliberately
+    # absent — it describes one machine, and .env.example is the template.
+    "Dockerfile",
+    "docker-compose.yml",
+    ".dockerignore",
+    ".env.example",
+    os.path.join("docker", "crontab"),
     ".gitignore",
     ".gitattributes",
 ]

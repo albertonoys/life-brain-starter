@@ -56,3 +56,7 @@ brain/recipes-library/
 brain/cook-data.json
 brain/cooking/.recipes.json
 brain/cook.html
+
+# This machine's Docker settings — hostnames, timezone, the host's UID.
+# .env.example is the template that IS committed.
+.env

@@ -340,6 +340,11 @@ install snippet. It prints only — never write into another repo from here.
 
 - The page server, the builds and the markdown work the same on Mac,
   Windows and Linux.
+- **On a server:** `Dockerfile` + `docker-compose.yml` at the repo root run
+  the page and the schedule in two containers, with this folder bind-mounted.
+  `BRAIN_ALLOWED_HOSTS` is what keeps serve.py's cross-site guard on despite
+  the container's 0.0.0.0 bind. Settings live in a git-ignored `.env`
+  (`.env.example` is the template). README.md has the walkthrough.
 - Secrets (Beeper token, email app passwords) live in the macOS Keychain on
   a Mac; on Windows and Linux install the `keyring` package
   (`pip install keyring`) so they land in the system credential store.

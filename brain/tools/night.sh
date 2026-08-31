@@ -1,4 +1,4 @@
-#!/bin/zsh
+#!/usr/bin/env bash
 # The night shift: do the heavy, slow work while nobody is waiting for it.
 #
 # WHY 01:00 AND NOT 03:00. Claude subscriptions meter usage in rolling
@@ -25,12 +25,27 @@ set -u
 # looking in more places than the morning run bothers with.
 export PATH="/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:$HOME/.local/bin:$HOME/.npm-global/bin:$HOME/bin"
 if [ -d "$HOME/.nvm/versions/node" ]; then
-  for d in "$HOME"/.nvm/versions/node/*/bin(N); do PATH="$PATH:$d"; done
+  # A glob that matches nothing stays literal in bash, so each hit is tested
+  # rather than trusted — zsh's (N) qualifier did this for us.
+  for d in "$HOME"/.nvm/versions/node/*/bin; do
+    [ -d "$d" ] && PATH="$PATH:$d"
+  done
 fi
 # Where the brain is, derived from this script's own location rather than
 # assumed to be ~/life-brain — the folder is often kept in Documents, and a
 # hardcoded path fails silently at 1am with nobody watching.
-BRAIN_DIR="${0:A:h:h:h}"
+#
+# The loop follows $0 through any symlinks first. bash has no equivalent of
+# zsh's ${0:A}, and `pwd -P` alone resolves directories but NOT the script
+# file itself — so a symlinked copy of this script would compute the wrong
+# brain and quietly work on nothing.
+SELF="$0"
+while [ -L "$SELF" ]; do
+  LINKDIR="$(cd "$(dirname "$SELF")" && pwd -P)"
+  SELF="$(readlink "$SELF")"
+  case "$SELF" in /*) ;; *) SELF="$LINKDIR/$SELF" ;; esac
+done
+BRAIN_DIR="$(cd "$(dirname "$SELF")/../.." && pwd -P)"
 cd "$BRAIN_DIR" || exit 1
 
 LOG="$BRAIN_DIR/brain/.night.log"
@@ -69,7 +84,10 @@ fi
 
 # On battery this would drain the machine flat by morning. Desktops report no
 # battery at all, which pmset prints as "AC Power" — so they always pass.
-if [ "$NIGHT_BATTERY" != "1" ]; then
+# Off a Mac there is no pmset, and a machine with no way to answer is a
+# machine on mains: a missing command must not read as "on battery" and
+# silently cancel every night shift on a server.
+if [ "$NIGHT_BATTERY" != "1" ] && command -v pmset > /dev/null 2>&1; then
   if ! pmset -g batt 2>/dev/null | grep -q "AC Power"; then
     echo "on battery — skipping (set night.on_battery true to override)" >> "$LOG"
     exit 0
@@ -114,7 +132,9 @@ python3 brain/tools/private_gate.py --lock >> "$LOG" 2>&1
 trap 'rm -f "$BRAIN_DIR/brain/.unattended"; python3 "$BRAIN_DIR/brain/tools/private_gate.py" --unlock' EXIT
 
 RESULT="$BRAIN_DIR/brain/.night-result.json"
-for JOB in ${(s: :)NIGHT_JOBS}; do
+# NIGHT_JOBS is a space-separated list; unquoted is the split, in bash.
+# shellcheck disable=SC2086
+for JOB in $NIGHT_JOBS; do
   # /scout is weekly by design: when events.md is under 6 days old, skip
   # before starting a claude run at all. The command self-gates on the same
   # date too — this check just makes the usual outcome free.

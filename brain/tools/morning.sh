@@ -1,4 +1,4 @@
-#!/bin/zsh
+#!/usr/bin/env bash
 # The 7am run: write today's plan before the owner is up, and only make a
 # sound if something genuinely needs them ("no news, no message").
 #
@@ -15,7 +15,18 @@ export PATH="/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin"
 # Where the brain is, derived from this script's own location rather than
 # assumed to be ~/life-brain — the folder is often kept in Documents, and a
 # hardcoded path fails silently at 1am with nobody watching.
-BRAIN_DIR="${0:A:h:h:h}"
+#
+# The loop follows $0 through any symlinks first. bash has no equivalent of
+# zsh's ${0:A}, and `pwd -P` alone resolves directories but NOT the script
+# file itself — so a symlinked copy of this script would compute the wrong
+# brain and quietly work on nothing.
+SELF="$0"
+while [ -L "$SELF" ]; do
+  LINKDIR="$(cd "$(dirname "$SELF")" && pwd -P)"
+  SELF="$(readlink "$SELF")"
+  case "$SELF" in /*) ;; *) SELF="$LINKDIR/$SELF" ;; esac
+done
+BRAIN_DIR="$(cd "$(dirname "$SELF")/../.." && pwd -P)"
 cd "$BRAIN_DIR" || exit 1
 
 LOG="$BRAIN_DIR/brain/.morning.log"
@@ -24,8 +35,13 @@ echo "--- $(date '+%Y-%m-%d %H:%M') morning run ---" >> "$LOG"
 # The smoke test: a quarter of a second, no network, no model. A failure
 # does not block the morning — it gets a notification, because a silently
 # broken parser is exactly the failure this system exists to prevent.
+# osascript exists only on a Mac. On a server nobody is sitting in front of
+# the machine anyway — the Telegram push at the end of this script is the
+# notification that actually arrives there.
 if ! python3 brain/tools/selftest.py >> "$LOG" 2>&1; then
-  osascript -e 'display notification "Something in the brain is broken — see brain/.morning.log" with title "Your brain" sound name "Basso"' 2>/dev/null
+  if command -v osascript > /dev/null 2>&1; then
+    osascript -e 'display notification "Something in the brain is broken — see brain/.morning.log" with title "Your brain" sound name "Basso"' 2>/dev/null
+  fi
 fi
 
 # Once per day: if today's plan is already dated today, a second wake
@@ -124,7 +140,7 @@ fi
 
 # Threshold-gated notification: silent unless something is actually on fire.
 python3 - <<'PY' >> "$LOG" 2>&1
-import subprocess, sys, os
+import shutil, subprocess, sys, os
 # The script already cd'd to the brain, wherever it lives — never assume
 # ~/life-brain here or the notification dies silently on other installs.
 sys.path.insert(0, os.path.join(os.getcwd(), "brain", "tools"))
@@ -139,9 +155,12 @@ if hot:
         bits.append(f"{len(b['chase'])} to chase")
     tail = " — plan is ready" if os.environ.get("MORNING_RUN") == "run" else ""
     msg = " and ".join(bits) + tail
-    subprocess.run(["osascript", "-e",
-                    f'display notification "{msg}" with title "Your brain" '
-                    f'sound name "Glass"'], timeout=10)
+    # No osascript off a Mac. The log line still records what the morning
+    # found, and the Telegram push below is what reaches a phone.
+    if shutil.which("osascript"):
+        subprocess.run(["osascript", "-e",
+                        f'display notification "{msg}" with title "Your brain" '
+                        f'sound name "Glass"'], timeout=10)
     print(f"notified: {msg}")
 else:
     print("all quiet, no notification")

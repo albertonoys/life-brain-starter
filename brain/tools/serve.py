@@ -52,6 +52,14 @@ PORT = int(os.environ.get("BRAIN_PORT", "7718"))
 # bind). BRAIN_BIND=0.0.0.0 opens it to whatever network you are on — only
 # ever do that on a network where you trust every device.
 BIND = os.environ.get("BRAIN_BIND", "127.0.0.1")
+# BRAIN_ALLOWED_HOSTS is a comma-separated list of names the page may be
+# reached under — the server's address on the network, say. It exists for the
+# container: a container has to bind 0.0.0.0 to be reachable at all, and
+# without this that bind would switch the guard below off entirely. Naming the
+# hosts keeps the guard on instead. Any later name (a proxy, a VPN) is one
+# more entry here and nothing else.
+EXTRA_HOSTS = {h.strip().lower() for h in
+               os.environ.get("BRAIN_ALLOWED_HOSTS", "").split(",") if h.strip()}
 
 # --- request-origin guard ---------------------------------------------------
 # The page has no login, so the only thing standing between the brain and a
@@ -61,9 +69,11 @@ BIND = os.environ.get("BRAIN_BIND", "127.0.0.1")
 # to 127.0.0.1 — the browser still sends the site's name in Host). Populated
 # in main() from the addresses actually bound. When BIND is 0.0.0.0 the owner
 # has deliberately opened it network-wide and no header can tell friend from
-# foe, so the guard steps aside (documented as the risky mode).
-ALLOWED_HOSTS = {"127.0.0.1", "localhost", "::1"}
-GUARD_ENFORCED = BIND != "0.0.0.0"
+# foe, so the guard steps aside (documented as the risky mode) — UNLESS
+# BRAIN_ALLOWED_HOSTS named the hosts, which answers the question a bare
+# 0.0.0.0 could not and so keeps the guard doing its job.
+ALLOWED_HOSTS = {"127.0.0.1", "localhost", "::1"} | EXTRA_HOSTS
+GUARD_ENFORCED = BIND != "0.0.0.0" or bool(EXTRA_HOSTS)
 
 
 def _host_only(value):
