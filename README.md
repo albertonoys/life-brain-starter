@@ -134,6 +134,9 @@ from elsewhere means putting something in front of it that asks who you are;
 whatever hostname you use for that goes in `BRAIN_ALLOWED_HOSTS`, and nothing
 else changes.
 
+Running it through Portainer instead? `docker/PORTAINER.md` — there is one
+trap worth reading about first, where the brain silently mounts as empty.
+
 Two containers come up: one serves the page, one runs the schedule (the 7am
 plan and, if you have switched it on, the 1am night shift). They log where
 they always have — `brain/.morning.log` and `brain/.night.log`.

@@ -27,7 +27,14 @@ x-brain: &brain
     BRAIN_WHISPER_MODEL: ${BRAIN_WHISPER_MODEL:-small}
   volumes:
     # The brain itself: code and life, read-write, on the host disk.
-    - .:/brain
+    #
+    # BRAIN_DIR must be an ABSOLUTE path when anything other than you runs
+    # `docker compose` from this folder — Portainer especially. Docker resolves
+    # a bind mount on the host, but Portainer clones a git stack inside its own
+    # /data volume, so a relative "." there points at a path the host does not
+    # have and Docker helpfully creates an empty one. An empty brain that looks
+    # like it is working is the worst outcome available, so name the path.
+    - ${BRAIN_DIR:-.}:/brain
     # Claude Code's login. Without this you sign in again on every rebuild.
     - claude-auth:/home/brain/.claude
     # The transcription model, so it downloads once instead of every restart.

@@ -80,6 +80,7 @@ ROOT_FILES = [
     ".dockerignore",
     ".env.example",
     os.path.join("docker", "crontab"),
+    os.path.join("docker", "PORTAINER.md"),
     ".gitignore",
     ".gitattributes",
 ]
