@@ -38,10 +38,11 @@ x-brain: &brain
     #
     # BRAIN_DIR must be an ABSOLUTE path when anything other than you runs
     # `docker compose` from this folder — Portainer especially. Docker resolves
-    # a bind mount on the host, but Portainer clones a git stack inside its own
-    # /data volume, so a relative "." there points at a path the host does not
-    # have and Docker helpfully creates an empty one. An empty brain that looks
-    # like it is working is the worst outcome available, so name the path.
+    # a bind mount on the host, but Portainer runs a stack out of its own
+    # /data/compose/<id>, so an unset BRAIN_DIR leaves "." pointing at a path
+    # the host does not have. Docker then creates it, root-owned and empty, and
+    # your brain silently becomes a scratch directory inside Portainer's data.
+    # This is not hypothetical — it is where the first deploy of this went.
     - ${BRAIN_DIR:-.}:/brain
     # Claude Code's login. Without this you sign in again on every rebuild.
     - claude-auth:/home/brain/.claude
