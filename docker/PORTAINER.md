@@ -31,12 +31,18 @@ container sorts it out on first start:
 That last row is deliberate. A folder with your things in it is not ours to
 write into, and a half-overwritten one would be worse than a failed deploy.
 
-So all you need is the path:
+So all you need is the path — but it has to be owned by the same user the
+container runs as, or the clone is refused. `sudo mkdir` alone leaves it owned
+by root, which is the usual way this goes wrong:
 
 ```
 sudo mkdir -p /srv/life-brain
-sudo chown $(id -u):$(id -g) /srv/life-brain
+sudo chown $(id -u):$(id -g) /srv/life-brain     # and use these same numbers
+                                                 # for UID/GID below
 ```
+
+The container says so plainly if they disagree — it prints what it runs as,
+what the folder is owned by, and the command that fixes it.
 
 Any path works — `/srv/life-brain` is just a habit. What matters is that it is
 yours to write to, and that it is somewhere you would think to back up, because
