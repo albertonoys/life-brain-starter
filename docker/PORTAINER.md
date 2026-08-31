@@ -31,18 +31,16 @@ container sorts it out on first start:
 That last row is deliberate. A folder with your things in it is not ours to
 write into, and a half-overwritten one would be worse than a failed deploy.
 
-So all you need is the path — but it has to be owned by the same user the
-container runs as, or the clone is refused. `sudo mkdir` alone leaves it owned
-by root, which is the usual way this goes wrong:
+So all you need is the path:
 
 ```
 sudo mkdir -p /srv/life-brain
-sudo chown $(id -u):$(id -g) /srv/life-brain     # and use these same numbers
-                                                 # for UID/GID below
 ```
 
-The container says so plainly if they disagree — it prints what it runs as,
-what the folder is owned by, and the command that fixes it.
+Ownership sorts itself out: the container starts as root, takes the folder if
+it is empty or root-owned, and drops to the unprivileged user before running
+anything. A folder that belongs to a real user, or has things in it that are
+not a brain, is refused rather than written into.
 
 Any path works — `/srv/life-brain` is just a habit. What matters is that it is
 yours to write to, and that it is somewhere you would think to back up, because
@@ -77,7 +75,7 @@ file in a Portainer stack; this is where those values go instead.
 
 | Name | Example | Why |
 |---|---|---|
-| `BRAIN_DIR` | `/srv/life-brain` | The folder from step 1. **Absolute.** Left unset it falls back to a relative path that means nothing to Portainer. |
+| `BRAIN_DIR` | `/srv/life-brain` | The folder from step 1. **Absolute, and the one that must be right.** Left unset, the stack silently runs against an empty scratch directory inside Portainer's own `/data/compose/<id>`. |
 | `BRAIN_REPO` | your fork's URL | Only used when cloning into an empty folder. Defaults to this repo. |
 | `BRAIN_REF` | `master` | The branch to clone. |
 | `BRAIN_ALLOWED_HOSTS` | `192.168.1.50,brainbox.local` | Every name you will open the page under. Anything else is refused. |

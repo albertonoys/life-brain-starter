@@ -1,5 +1,6 @@
 #!/bin/sh
-# Make sure /brain actually holds a brain before anything tries to run one.
+# Make sure /brain holds a brain, owned by the right user, before anything
+# tries to run one.
 #
 # The brain is bind-mounted from the host rather than baked into the image,
 # because code and life live in the same git folder here: your notes and
@@ -7,59 +8,77 @@
 # their work are the undo for everything. That only means something if the
 # folder is somewhere you can reach — edit, git log, back up.
 #
-# The cost used to be a manual clone before the first deploy, and a bind mount
-# pointed at the wrong path fails in the worst possible way: Docker creates an
-# empty directory and everything starts happily against nothing. So:
+# The cost is that three things have to agree, set in three different places:
+# the folder on the host, the UID the image was built with, and BRAIN_DIR in
+# the stack. Nothing keeps them in step, and every way they can disagree used
+# to fail obscurely — a bind mount pointed nowhere becomes an empty directory
+# that everything starts happily against, and one owned by root becomes a git
+# error about .git that names neither the user nor the folder.
 #
-#   already a brain  -> use it, touch nothing
-#   empty            -> clone one into it
-#   something else   -> refuse, and say what is there
+# So this runs as root, settles all of it, and only then becomes the real user:
 #
-# The last case is the important one. Whatever is in that folder, it is not
-# ours to write into.
+#   already a brain, ours       -> use it
+#   already a brain, root's     -> take ownership, say so
+#   already a brain, someone's  -> refuse
+#   empty                       -> take ownership, clone into it
+#   anything else               -> refuse, and list what is there
+#
+# Root is PID 1 for the few lines above the exec and not one line further.
 
 set -eu
 
 BRAIN=/brain
 MARKER="$BRAIN/brain/tools/serve.py"
+UID_T="${BRAIN_UID:-1000}"
+GID_T="${BRAIN_GID:-1000}"
 REPO="${BRAIN_REPO:-https://github.com/albertonoys/life-brain-starter}"
 REF="${BRAIN_REF:-master}"
 
-# Before anything: can we write here at all? The container runs as the UID it
-# was built with, and BRAIN_DIR is owned by whoever made it on the host — two
-# numbers set in two different places, with nothing keeping them in step. When
-# they disagree the symptom is a git error about .git, which says nothing about
-# the actual problem. So check first, and say both numbers out loud.
-if [ ! -w "$BRAIN" ]; then
-    ME="$(id -u):$(id -g)"
-    OWNER="$(stat -c '%u:%g' "$BRAIN" 2>/dev/null || echo 'unknown')"
-    echo "  Cannot write to /brain." >&2
-    echo "    this container runs as  $ME" >&2
-    echo "    the folder is owned by  $OWNER" >&2
-    if [ "$ME" = "$OWNER" ]; then
-        # Same user, still refused: the permission bits are the problem, and
-        # chown would be a confusing thing to be told to run here.
-        echo "  The owner is right, so it is the permissions:" >&2
-        echo "    $(stat -c '%A' "$BRAIN" 2>/dev/null)" >&2
-        echo "  On the server: chmod u+rwx <the folder BRAIN_DIR points at>" >&2
-    else
-        echo "  Those have to match. On the server, either:" >&2
-        echo "    sudo chown -R $ME <the folder BRAIN_DIR points at>" >&2
-        echo "  or rebuild the image with UID/GID set to $OWNER." >&2
-    fi
+listing() {
+    echo "  It currently holds:" >&2
+    ls -A "$BRAIN" 2>/dev/null | head -10 | sed 's/^/    /' >&2
+    echo "  Point BRAIN_DIR at an empty folder, or at a brain you own." >&2
+}
+
+# Two different problems, and being told the wrong one costs an afternoon.
+refuse_owner() {
+    echo "  /brain is a brain, but not one this container may write to." >&2
+    echo "  It is owned by uid $1, and this container runs as $UID_T." >&2
+    listing
     exit 1
-fi
+}
+
+refuse_content() {
+    echo "  /brain has things in it, and none of them are a brain." >&2
+    echo "  Refusing to write into it." >&2
+    listing
+    exit 1
+}
+
+mkdir -p "$BRAIN"
+OWNER="$(stat -c '%u' "$BRAIN" 2>/dev/null || echo 0)"
 
 if [ -f "$MARKER" ]; then
-    :                                   # a brain is already here
+    if [ "$OWNER" != "$UID_T" ]; then
+        # root-owned is what Docker leaves behind when it creates a missing
+        # bind source, and what a container built as root writes. Adopting it
+        # is right. Any other user is a person, and their folder is theirs.
+        if [ "$OWNER" = "0" ]; then
+            echo "  /brain is root-owned — taking ownership as $UID_T:$GID_T."
+            chown -R "$UID_T:$GID_T" "$BRAIN"
+        else
+            refuse_owner "$OWNER"
+        fi
+    fi
 elif [ -z "$(ls -A "$BRAIN" 2>/dev/null)" ]; then
-    # Empty. Only the service that was told to bootstrap does the cloning —
-    # both containers start at once, and two clones into one directory is a
-    # race with no winner. The other one waits for the result.
+    chown "$UID_T:$GID_T" "$BRAIN"
+    # Both containers start at once, and two clones into one directory is a
+    # race with no winner — so exactly one is allowed to do it, and the other
+    # waits for the result.
     if [ "${BRAIN_BOOTSTRAP:-0}" = "1" ]; then
         echo "  /brain is empty — cloning $REPO ($REF) into it."
-        git clone --branch "$REF" "$REPO" "$BRAIN"
-        echo "  Cloned. Your brain lives on the host at whatever BRAIN_DIR points to."
+        gosu "$UID_T:$GID_T" git clone --branch "$REF" "$REPO" "$BRAIN"
+        echo "  Cloned. It lives on the host, at whatever BRAIN_DIR points at."
     else
         echo "  /brain is empty; waiting for the page container to clone it."
         i=0
@@ -73,11 +92,7 @@ elif [ -z "$(ls -A "$BRAIN" 2>/dev/null)" ]; then
         fi
     fi
 else
-    echo "  BRAIN_DIR points at a folder that is not a brain and is not empty." >&2
-    echo "  Refusing to write into it. It currently holds:" >&2
-    ls -A "$BRAIN" | head -10 | sed 's/^/    /' >&2
-    echo "  Point BRAIN_DIR at an empty folder, or at an existing brain." >&2
-    exit 1
+    refuse_content
 fi
 
-exec "$@"
+exec gosu "$UID_T:$GID_T" "$@"

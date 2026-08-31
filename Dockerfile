@@ -21,7 +21,7 @@ FROM node:22-bookworm-slim
 # No zsh. morning.sh and night.sh are plain bash, which is the whole reason
 # they were converted.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        python3 python3-venv git tzdata ca-certificates curl procps \
+        python3 python3-venv git tzdata ca-certificates curl procps gosu \
     && rm -rf /var/lib/apt/lists/*
 
 # Claude Code itself. The queue button, the Sessions page and the 7am /today
@@ -89,20 +89,26 @@ RUN if [ "$UID" != "0" ]; then \
     fi \
     && mkdir -p /home/brain/.claude /home/brain/.cache/huggingface \
     && chown -R "$UID:$GID" /home/brain
-USER ${UID}:${GID}
+
+# The entrypoint reads these to know who to become. They are the build args
+# again, kept as environment so the running container can answer "who am I
+# supposed to be?" without anyone having to remember what it was built with.
+ENV BRAIN_UID=${UID}
+ENV BRAIN_GID=${GID}
 ENV HOME=/home/brain
 
-# git is the brain's undo, and both scheduled scripts commit. A bind-mount is
+# git is the brain's undo, and both scheduled scripts commit. A bind mount is
 # owned by the host, which git treats as suspicious until told otherwise; the
-# identity is here so an unattended 1am commit has an author.
-RUN git config --global --add safe.directory /brain \
-    && git config --global user.name "life-brain" \
-    && git config --global user.email "brain@localhost"
+# identity is here so an unattended 1am commit has an author. Written as root
+# into the target user's home, then handed over — there is no USER yet.
+RUN HOME=/home/brain git config --global --add safe.directory /brain \
+    && HOME=/home/brain git config --global user.name "life-brain" \
+    && HOME=/home/brain git config --global user.email "brain@localhost" \
+    && chown "$UID:$GID" /home/brain/.gitconfig
 
-# The one file that IS copied in. It runs before anything else and makes sure
-# /brain holds a brain — using what is there, cloning into an empty folder, or
-# refusing to write into someone else's directory. See the file for why an
-# empty bind mount is the failure worth spending a script on.
+# The one file that IS copied in. It runs as root — the only thing that does —
+# so it can settle who owns the brain folder before handing everything to the
+# unprivileged user with gosu. See the file for why that is worth doing.
 COPY --chmod=0755 docker/entrypoint.sh /usr/local/bin/brain-entrypoint
 
 WORKDIR /brain
