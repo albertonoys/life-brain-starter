@@ -4191,6 +4191,15 @@ def main():
         print(f"  On your phone:    http://{phone[0]}:{PORT}/")
     if note:
         print(f"  Note: {note}")
+    # Listening wide with nothing to check a Host against is the one
+    # configuration where the guard is off. It is a legitimate choice on a
+    # network you trust, but it must never be one you made by forgetting a
+    # variable — so it says so, every start, where it cannot be missed.
+    if not GUARD_ENFORCED:
+        print("\n  ! The cross-site guard is OFF: listening on 0.0.0.0 with no\n"
+              "    BRAIN_ALLOWED_HOSTS set, so any name reaches this page and\n"
+              "    any site your browser visits can post to it. Set\n"
+              "    BRAIN_ALLOWED_HOSTS to the names you open the page under.")
     print(f"\n  {len(b['live'])} live workstreams · {len(b['overdue'])} overdue · "
           f"{len(b['chase'])} need a chase · {len(b['cold'])} going cold")
     print("\n  Leave this window open. Ctrl-C when you're done.\n")

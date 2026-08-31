@@ -21,7 +21,7 @@ x-brain: &brain
     BRAIN_ALLOWED_HOSTS: ${BRAIN_ALLOWED_HOSTS}
     # The night shift refuses to run outside 23:00–06:00, and the plan is
     # written at 07:00 — both are local time, so this has to be right.
-    TZ: ${TZ:-UTC}
+    TZ: ${TZ:-Europe/Madrid}
     HF_HOME: /home/brain/.cache/huggingface
     OMP_NUM_THREADS: ${OMP_NUM_THREADS:-4}
     BRAIN_WHISPER_MODEL: ${BRAIN_WHISPER_MODEL:-small}
