@@ -1,6 +1,27 @@
 # Two containers off one image, sharing the same brain folder: one serves the
 # page, one runs the schedule. Copy .env.example to .env and fill it in first.
 
+# The environment is its own anchor so a service can add a single key to it.
+# `<<:` inside a mapping merges; a second `environment:` on the service would
+# replace the whole block instead, which silently drops every variable here.
+x-brain-env: &brain-env
+  # A container has to listen on 0.0.0.0 to be reachable from outside it.
+  BRAIN_BIND: "0.0.0.0"
+  BRAIN_PORT: "7718"
+  # The names you will actually open the page under. This is what keeps the
+  # cross-site guard switched on despite the wide bind — see serve.py.
+  BRAIN_ALLOWED_HOSTS: ${BRAIN_ALLOWED_HOSTS}
+  # The night shift refuses to run outside 23:00–06:00, and the plan is
+  # written at 07:00 — both are local time, so this has to be right.
+  TZ: ${TZ:-Europe/Madrid}
+  HF_HOME: /home/brain/.cache/huggingface
+  OMP_NUM_THREADS: ${OMP_NUM_THREADS:-4}
+  BRAIN_WHISPER_MODEL: ${BRAIN_WHISPER_MODEL:-small}
+  # Where to clone from, if BRAIN_DIR points at an empty folder. Change these
+  # to your own fork and the brain comes up as yours.
+  BRAIN_REPO: ${BRAIN_REPO:-https://github.com/albertonoys/life-brain-starter}
+  BRAIN_REF: ${BRAIN_REF:-master}
+
 x-brain: &brain
   build:
     context: .
@@ -12,19 +33,6 @@ x-brain: &brain
       # small machine, and it makes the image about three times the size.
       WITH_WHISPER: ${WITH_WHISPER:-false}
   image: life-brain:latest
-  environment:
-    # A container has to listen on 0.0.0.0 to be reachable from outside it.
-    BRAIN_BIND: "0.0.0.0"
-    BRAIN_PORT: "7718"
-    # The names you will actually open the page under. This is what keeps the
-    # cross-site guard switched on despite the wide bind — see serve.py.
-    BRAIN_ALLOWED_HOSTS: ${BRAIN_ALLOWED_HOSTS}
-    # The night shift refuses to run outside 23:00–06:00, and the plan is
-    # written at 07:00 — both are local time, so this has to be right.
-    TZ: ${TZ:-Europe/Madrid}
-    HF_HOME: /home/brain/.cache/huggingface
-    OMP_NUM_THREADS: ${OMP_NUM_THREADS:-4}
-    BRAIN_WHISPER_MODEL: ${BRAIN_WHISPER_MODEL:-small}
   volumes:
     # The brain itself: code and life, read-write, on the host disk.
     #
@@ -49,6 +57,12 @@ services:
     <<: *brain
     container_name: life-brain
     command: ["python3", "brain/tools/serve.py"]
+    environment:
+      <<: *brain-env
+      # Both containers start at once, and two clones into one directory is a
+      # race with no winner — so exactly one of them is allowed to do it. The
+      # other waits for the result.
+      BRAIN_BOOTSTRAP: "1"
     ports:
       # On the network, so a phone on the same wifi can open it. The page has
       # no login — see the README before putting this anywhere less trusted.
@@ -64,6 +78,7 @@ services:
     <<: *brain
     container_name: life-brain-cron
     command: ["supercronic", "-passthrough-logs", "/brain/docker/crontab"]
+    environment: *brain-env
     depends_on:
       - brain
 

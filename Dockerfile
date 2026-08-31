@@ -99,6 +99,13 @@ RUN git config --global --add safe.directory /brain \
     && git config --global user.name "life-brain" \
     && git config --global user.email "brain@localhost"
 
+# The one file that IS copied in. It runs before anything else and makes sure
+# /brain holds a brain — using what is there, cloning into an empty folder, or
+# refusing to write into someone else's directory. See the file for why an
+# empty bind mount is the failure worth spending a script on.
+COPY --chmod=0755 docker/entrypoint.sh /usr/local/bin/brain-entrypoint
+
 WORKDIR /brain
 EXPOSE 7718
+ENTRYPOINT ["/usr/local/bin/brain-entrypoint"]
 CMD ["python3", "brain/tools/serve.py"]
