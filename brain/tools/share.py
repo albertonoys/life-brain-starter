@@ -81,6 +81,7 @@ ROOT_FILES = [
     ".env.example",
     os.path.join("docker", "crontab"),
     os.path.join("docker", "PORTAINER.md"),
+    os.path.join("docker", "entrypoint.sh"),
     ".gitignore",
     ".gitattributes",
 ]

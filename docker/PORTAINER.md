@@ -17,19 +17,38 @@ Docker's response to a bind source that does not exist is to create an empty
 directory and carry on. You would get a running page, backed by an empty
 brain, with no error anywhere. Hence `BRAIN_DIR`, and hence: make it absolute.
 
-## 1. Put the brain on the server
+## 1. Decide where the brain lives
 
-Over SSH, once:
+You do not have to clone anything. Point `BRAIN_DIR` at a folder and the page
+container sorts it out on first start:
+
+| What is at `BRAIN_DIR` | What happens |
+|---|---|
+| Nothing, or an empty folder | It clones one in |
+| An existing brain | It uses it, untouched |
+| Anything else | It refuses to start, and lists what it found |
+
+That last row is deliberate. A folder with your things in it is not ours to
+write into, and a half-overwritten one would be worse than a failed deploy.
+
+So all you need is the path:
 
 ```
-sudo mkdir -p /srv && cd /srv
-sudo git clone https://github.com/albertonoys/life-brain-starter life-brain
-sudo chown -R $(id -u):$(id -g) /srv/life-brain
+sudo mkdir -p /srv/life-brain
+sudo chown $(id -u):$(id -g) /srv/life-brain
 ```
 
 Any path works — `/srv/life-brain` is just a habit. What matters is that it is
-yours to write to, backed up like anything else you care about, and that you
-use the same path in `BRAIN_DIR` below.
+yours to write to, and that it is somewhere you would think to back up, because
+after this it holds your whole life-admin history.
+
+Cloning it yourself still works if you prefer, and is the way to start from an
+existing brain:
+
+```
+sudo git clone https://github.com/albertonoys/life-brain-starter /srv/life-brain
+sudo chown -R $(id -u):$(id -g) /srv/life-brain
+```
 
 ## 2. Add the stack
 
@@ -52,7 +71,9 @@ file in a Portainer stack; this is where those values go instead.
 
 | Name | Example | Why |
 |---|---|---|
-| `BRAIN_DIR` | `/srv/life-brain` | The folder from step 1. Absolute. The one that breaks everything if it is wrong. |
+| `BRAIN_DIR` | `/srv/life-brain` | The folder from step 1. **Absolute.** Left unset it falls back to a relative path that means nothing to Portainer. |
+| `BRAIN_REPO` | your fork's URL | Only used when cloning into an empty folder. Defaults to this repo. |
+| `BRAIN_REF` | `master` | The branch to clone. |
 | `BRAIN_ALLOWED_HOSTS` | `192.168.1.50,brainbox.local` | Every name you will open the page under. Anything else is refused. |
 | `TZ` | `Europe/Madrid` | The 7am plan and the 1am night shift are local time. |
 | `UID` | `1000` | Run `id -u` on the server. Files the brain writes are owned by this. |
