@@ -48,7 +48,7 @@ cat > "$PLIST" <<PLISTEOF
     <string>$LABEL</string>
     <key>ProgramArguments</key>
     <array>
-        <string>/bin/zsh</string>
+        <string>/bin/bash</string>
         <string>$BRAIN_DIR/brain/tools/morning.sh</string>
     </array>
     <key>StartCalendarInterval</key>

@@ -1,0 +1,14 @@
+# The brain's schedule. Times are local to the container, which takes TZ from
+# .env — set it, or the night shift and the morning plan land in the wrong
+# part of someone else's day.
+#
+# Both scripts write their own logs (brain/.morning.log, brain/.night.log) and
+# both refuse to run twice in a day, so a container restart cannot double up.
+# The night shift additionally does nothing at all until night.enabled is set
+# in brain/config.json.
+
+# The morning plan, before anyone is up.
+0 7 * * * cd /brain && bash brain/tools/morning.sh
+
+# The heavy jobs, in their own usage window, five hours clear of the morning.
+0 1 * * * cd /brain && bash brain/tools/night.sh

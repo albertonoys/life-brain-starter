@@ -108,6 +108,46 @@ Everything above works the same, with two notes.
 
 Secrets, meaning the Beeper token and email app passwords, are stored in Windows Credential Manager, which needs one extra package: `pip install keyring`. And phone access via Tailscale is found automatically, either on PATH or in the default install folder.
 
+## Running it on a server
+
+The brain can live on a machine that is always on instead of a laptop, so the
+page is always there and the 7am plan always gets written. Everything runs in
+Docker; your brain folder stays on the host, exactly where it is now, and the
+container reads and writes it in place. Git on the host is still the undo.
+
+```
+cp .env.example .env          # then edit it — the comments say what each line is
+echo "UID=$(id -u)" >> .env   # so files stay yours, not root's
+echo "GID=$(id -g)" >> .env
+docker compose up -d --build
+docker compose exec -it brain claude    # sign in once; it is remembered
+```
+
+Then open `http://your-server:7718/` from anything on the same network,
+including your phone.
+
+**The page has no login.** Anyone who can reach it can read your brain and
+write to it — the journal, the people file, everything. On your own home
+network that is the same trust you already give the machines in your house.
+It is not a thing to expose to the internet, an office, or a café. Reaching it
+from elsewhere means putting something in front of it that asks who you are;
+whatever hostname you use for that goes in `BRAIN_ALLOWED_HOSTS`, and nothing
+else changes.
+
+Two containers come up: one serves the page, one runs the schedule (the 7am
+plan and, if you have switched it on, the 1am night shift). They log where
+they always have — `brain/.morning.log` and `brain/.night.log`.
+
+**Voice memos** are off in this build, because they roughly triple the image
+size. `WITH_WHISPER=true` in `.env` turns them on. Be realistic about speed on
+a small server: on a low-power box a 20-minute recording takes about 20
+minutes. `BRAIN_WHISPER_MODEL=base` is roughly twice as fast and rougher.
+
+Two things do not work in a container, both Mac-only by nature: reading the
+Mac Calendar app (subscribe to a calendar feed instead — see above), and
+Beeper's "last spoke" sync, which needs the Beeper app itself running. The
+morning run logs that one as skipped and carries on.
+
 ## Passing it on
 
 Like it? Do not copy your folder, because your whole life is in it, including the git history. Run `python3 brain/tools/share.py --yes` instead. It builds a clean copy in `dist/`, with the code and page intact and every data file empty, scans the result to prove nothing personal slipped in, and zips it. Send the zip.

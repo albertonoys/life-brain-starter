@@ -1,0 +1,65 @@
+# Two containers off one image, sharing the same brain folder: one serves the
+# page, one runs the schedule. Copy .env.example to .env and fill it in first.
+
+x-brain: &brain
+  build:
+    context: .
+    args:
+      # So files the brain writes stay yours, not root's.
+      UID: ${UID:-1000}
+      GID: ${GID:-1000}
+      # Voice memos. See the README before turning this on — it is slow on a
+      # small machine, and it makes the image about three times the size.
+      WITH_WHISPER: ${WITH_WHISPER:-false}
+  image: life-brain:latest
+  environment:
+    # A container has to listen on 0.0.0.0 to be reachable from outside it.
+    BRAIN_BIND: "0.0.0.0"
+    BRAIN_PORT: "7718"
+    # The names you will actually open the page under. This is what keeps the
+    # cross-site guard switched on despite the wide bind — see serve.py.
+    BRAIN_ALLOWED_HOSTS: ${BRAIN_ALLOWED_HOSTS}
+    # The night shift refuses to run outside 23:00–06:00, and the plan is
+    # written at 07:00 — both are local time, so this has to be right.
+    TZ: ${TZ:-UTC}
+    HF_HOME: /home/brain/.cache/huggingface
+    OMP_NUM_THREADS: ${OMP_NUM_THREADS:-4}
+    BRAIN_WHISPER_MODEL: ${BRAIN_WHISPER_MODEL:-small}
+  volumes:
+    # The brain itself: code and life, read-write, on the host disk.
+    - .:/brain
+    # Claude Code's login. Without this you sign in again on every rebuild.
+    - claude-auth:/home/brain/.claude
+    # The transcription model, so it downloads once instead of every restart.
+    - hf-cache:/home/brain/.cache/huggingface
+    # Project folders the brain follows (config.json "sources"), read-only:
+    # the brain reads their TODO.md and must never write to them.
+    # - ${PROJECTS_DIR:-/home/you/repos}:/projects:ro
+  restart: unless-stopped
+
+services:
+  brain:
+    <<: *brain
+    container_name: life-brain
+    command: ["python3", "brain/tools/serve.py"]
+    ports:
+      # On the network, so a phone on the same wifi can open it. The page has
+      # no login — see the README before putting this anywhere less trusted.
+      - "${BRAIN_PORT:-7718}:7718"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://127.0.0.1:7718/"]
+      interval: 60s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
+
+  cron:
+    <<: *brain
+    container_name: life-brain-cron
+    command: ["supercronic", "-passthrough-logs", "/brain/docker/crontab"]
+    depends_on:
+      - brain
+
+volumes:
+  claude-auth:
+  hf-cache:

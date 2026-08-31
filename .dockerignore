@@ -1,0 +1,16 @@
+# Nothing here is COPYed into the image — the brain is bind-mounted instead —
+# but the build context still gets sent to the Docker daemon, so keep it small.
+# brain/recipes-library alone is around half a gigabyte.
+.git
+brain/recipes-library/
+brain/files/
+brain/avatars/
+brain/finance/
+brain/transcripts/
+brain/journal/
+brain/.voice/
+dist/
+__pycache__/
+**/__pycache__/
+*.log
+.env
