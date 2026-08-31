@@ -68,12 +68,28 @@ RUN if [ "$WITH_WHISPER" = "true" ]; then \
 # owns it on the host — otherwise every file the brain touches turns up
 # root-owned and the host user can no longer edit their own life.
 #   docker compose build --build-arg UID=$(id -u) --build-arg GID=$(id -g)
+#
+# USER is set numerically rather than by name, which is what makes UID=0 work:
+# building as root, there is no user to create (root is already there, and
+# `useradd -u 0` fails outright), but `USER 0:0` is still perfectly valid. The
+# passwd entry below is a courtesy for tools that look one up; the numbers are
+# what actually decide who owns the files.
+#
+# /home/brain is created and chowned HERE, before the volumes mount over it,
+# because a fresh named volume inherits the ownership of the image directory
+# underneath it. Skip this and Claude's login volume arrives root-owned and
+# unwritable by the very user meant to write to it.
 ARG UID=1000
 ARG GID=1000
-RUN userdel -r node 2>/dev/null || true \
-    && (getent group "$GID" > /dev/null || groupadd -g "$GID" brain) \
-    && useradd -u "$UID" -g "$GID" -m -s /bin/bash brain
-USER brain
+RUN if [ "$UID" != "0" ]; then \
+        userdel -r node 2>/dev/null || true ; \
+        getent group "$GID" > /dev/null || groupadd -g "$GID" brain ; \
+        getent passwd "$UID" > /dev/null || \
+            useradd -u "$UID" -g "$GID" -M -d /home/brain -s /bin/bash brain ; \
+    fi \
+    && mkdir -p /home/brain/.claude /home/brain/.cache/huggingface \
+    && chown -R "$UID:$GID" /home/brain
+USER ${UID}:${GID}
 ENV HOME=/home/brain
 
 # git is the brain's undo, and both scheduled scripts commit. A bind-mount is

@@ -64,6 +64,16 @@ file in a Portainer stack; this is where those values go instead.
 brain writes belongs to the wrong user, and you can no longer edit your own
 life from a normal shell.
 
+**On `UID=0`.** If you read those numbers off a root shell you will get `0`,
+and the build accepts it — root is a legitimate answer, and the image handles
+it. But then the brain writes into `/srv/life-brain` as root, and editing your
+own notes from an ordinary shell stops working. Prefer the numbers of the user
+who owns that folder:
+
+```
+stat -c '%u %g' /srv/life-brain
+```
+
 ## 4. Sign in to Claude, once
 
 The containers come up before Claude Code has a login, so the page works and
