@@ -14081,6 +14081,182 @@ body.asking .fab,body.asking .btour-btn,body.asking .agentbar{display:none}
 body.asking .fab,body.asking .btour-btn,body.asking .agentbar{display:none}
 
 </style>
+<style>
+.askopen{font:inherit;font-size:var(--t-sm,13px);font-weight:600;cursor:pointer;
+  color:var(--ink);background:var(--surface);border:1px solid var(--line2);
+  border-radius:var(--r-btn,10px);padding:6px 12px;white-space:nowrap}
+.askopen:hover{border-color:var(--dim)}
+/* Above the tour (79-82), which lays a full-screen transparent button over
+   the page to catch "click anywhere to advance". At 60/61 the Ask panel
+   opened UNDERNEATH that button: every click in the panel was swallowed by
+   the tour while the keyboard, which does not hit-test, went on working. A
+   panel she opened on purpose is the topmost thing on the page. */
+.askscrim{position:fixed;inset:0;z-index:95;background:rgba(0,0,0,.22);
+  opacity:0;transition:opacity .16s ease-out}
+.askscrim.on{opacity:1}
+.askscrim[hidden]{display:none}
+.askpanel{position:fixed;top:0;right:0;bottom:0;z-index:96;width:min(440px,100vw);
+  display:flex;flex-direction:column;background:var(--paper);
+  border-left:1px solid var(--line);box-shadow:-8px 0 34px rgba(0,0,0,.14);
+  transform:translateX(100%);
+  transition:transform .2s cubic-bezier(.16,1,.3,1),width .2s ease}
+.askpanel.on{transform:none}
+.askpanel[hidden]{display:none}
+/* Full screen: the same panel, the whole window. The thread keeps a reading
+   column in the middle; the chats list becomes a real sidebar. */
+.askpanel.wide{width:100vw;border-left:0}
+.askpanel.wide .askctx,.askpanel.wide .askthread,.askpanel.wide .askfoot{
+  padding-left:max(24px,calc((100% - 760px)/2));
+  padding-right:max(24px,calc((100% - 760px)/2))}
+.askmain{position:relative;display:flex;flex:1;min-height:0}
+.askcol{flex:1;display:flex;flex-direction:column;min-width:0}
+.asklist{flex:none;width:250px;overflow-y:auto;padding:10px;
+  border-right:1px solid var(--line);background:var(--surface)}
+.asklist[hidden]{display:none}
+/* In the side panel the list lays over the thread instead of squeezing it. */
+.askpanel:not(.wide) .asklist{position:absolute;inset:0;width:auto;z-index:6;
+  background:var(--paper);border-right:0}
+.asklistnew{display:block;width:100%;font:inherit;font-size:13px;font-weight:600;
+  cursor:pointer;text-align:left;color:var(--ink);background:var(--paper);
+  border:1px solid var(--line2);border-radius:10px;padding:8px 11px;
+  margin-bottom:10px}
+.asklistnew:hover{border-color:var(--dim)}
+.asklab{font-size:10.5px;font-weight:700;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--faint);margin:10px 4px 5px}
+.askitem{display:block;width:100%;font:inherit;cursor:pointer;text-align:left;
+  border:0;background:none;border-radius:9px;padding:7px 9px;color:var(--dim)}
+.askitem:hover{background:var(--sunken,var(--surface));color:var(--ink)}
+.askitem.on{background:var(--sunken,var(--surface));color:var(--ink)}
+.askitem .askitop{display:block;font-size:13px;font-weight:500;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.askitem .askimeta{display:block;font-size:11px;color:var(--faint);margin-top:1px}
+.askitem .askimeta.busy{color:var(--green,var(--ink));font-weight:600}
+/* A file the answer names opens right here, rendered — never a trip to the
+   Finder for a draft the chat just wrote. */
+.askdoc{color:var(--green,var(--ink));text-decoration:underline;cursor:pointer}
+.askdocview{position:absolute;inset:0;z-index:7;display:flex;flex-direction:column;
+  background:var(--paper)}
+.askdocview[hidden]{display:none}
+.askdochead{flex:none;display:flex;gap:12px;align-items:center;padding:11px 16px;
+  border-bottom:1px solid var(--line)}
+.askdocback{font:inherit;font-size:12px;font-weight:600;cursor:pointer;border:0;
+  background:none;color:var(--green,var(--ink));padding:0;white-space:nowrap}
+.askdocback:hover{text-decoration:underline}
+.askdocname{font-size:11.5px;color:var(--faint);overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.askdocbody{flex:1;overflow-y:auto;padding:18px 20px;font-size:14px;line-height:1.6}
+.askpanel.wide .askdocbody{padding-left:max(24px,calc((100% - 760px)/2));
+  padding-right:max(24px,calc((100% - 760px)/2))}
+.askdocbody h1,.askdocbody h2,.askdocbody h3{
+  font-family:var(--serif,'Literata',Georgia,serif);margin:14px 0 8px;line-height:1.25}
+.askdocbody h1{font-size:20px}
+.askdocbody h2{font-size:16px}
+.askdocbody h3{font-size:14px}
+.askdocbody p{margin:0 0 9px}
+.askdocbody ul,.askdocbody ol{margin:0 0 9px;padding-left:22px}
+.askdocbody li{margin:0 0 3px}
+.askdocbody code{font-family:ui-monospace,Menlo,monospace;font-size:12.5px;
+  background:var(--surface);padding:1px 4px;border-radius:4px}
+.askdocbody blockquote{margin:0 0 9px;padding:2px 0 2px 12px;
+  border-left:3px solid var(--line);color:var(--dim)}
+.askhead{display:flex;gap:10px;align-items:center;padding:13px 16px;
+  border-bottom:1px solid var(--line);flex:none}
+.askhead>div{flex:1;min-width:0}
+.askhead h2{margin:0;font:600 15px/1.2 var(--serif,'Literata',Georgia,serif)}
+.askhead .asksub{font-size:11.5px;color:var(--faint);overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.askico{flex:none;border:0;background:none;cursor:pointer;color:var(--dim);
+  font-size:15px;line-height:1;padding:4px 5px;border-radius:8px}
+.askico:hover{color:var(--ink);background:var(--surface)}
+.askico.on{color:var(--ink);background:var(--sunken,var(--surface))}
+.askx{border:0;background:none;color:var(--faint);cursor:pointer;
+  font-size:20px;line-height:1;padding:2px 4px}
+.askx:hover{color:var(--ink)}
+.askfull{flex:none;font-size:11.5px;font-weight:600;color:var(--green,var(--ink));
+  text-decoration:none;white-space:nowrap}
+.askfull:hover{text-decoration:underline}
+.askthread{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;
+  gap:14px;font-size:14px;line-height:1.55}
+.askmsg{max-width:92%}
+.askmsg.her{align-self:flex-end;background:var(--sunken,var(--surface));
+  border-radius:12px 12px 4px 12px;padding:10px 13px;white-space:pre-wrap}
+.askmsg.claude .askwho{font-size:10.5px;font-weight:700;letter-spacing:.09em;
+  text-transform:uppercase;color:var(--faint);margin-bottom:5px}
+.askmsg.claude .askbody p{margin:0 0 8px}
+.askmsg.claude .askbody p:last-child{margin:0}
+.askmsg.claude .askbody li{margin:0 0 3px}
+.askmsg.claude .askbody ul{margin:0 0 8px;padding-left:20px}
+.askmsg.claude .askbody code{font-family:ui-monospace,Menlo,monospace;font-size:12.5px;
+  background:var(--surface);padding:1px 4px;border-radius:4px}
+.askmsg.claude .askbody pre{margin:0 0 8px;padding:9px 11px;overflow-x:auto;
+  font:12px/1.5 ui-monospace,Menlo,monospace;background:var(--surface);
+  border:1px solid var(--line);border-radius:8px;white-space:pre}
+.askmsg.claude .askbody table{border-collapse:collapse;margin:0 0 8px;
+  font-size:13px;display:block;overflow-x:auto;max-width:100%}
+.askmsg.claude .askbody th,.askmsg.claude .askbody td{border:1px solid var(--line);
+  padding:4px 9px;text-align:left;vertical-align:top}
+.askmsg.claude .askbody th{background:var(--surface)}
+.askmsg.claude .askbody hr{border:0;border-top:1px solid var(--line);margin:10px 0}
+.askmsg.note{align-self:center;font-size:12px;color:var(--faint);text-align:center}
+.askempty{margin:auto 0;color:var(--faint);font-size:13.5px;text-align:center;
+  padding:0 10px}
+.askwork{display:flex;gap:8px;align-items:center;color:var(--faint);font-size:12.5px}
+.askwork i{width:7px;height:7px;border-radius:50%;background:var(--green,var(--ink));
+  animation:askpulse 1.3s ease-in-out infinite}
+@keyframes askpulse{0%,100%{opacity:1}50%{opacity:.3}}
+@media(prefers-reduced-motion:reduce){
+  .askwork i{animation:none}
+  .askpanel{transition:none}
+}
+/* What it should look at. "everything" is the whole brain; picking chips
+   narrows the question — cheaper, and the answer stops wandering off into
+   the other eleven files. Nothing selected is a plain chat: no files read. */
+.askctx{flex:none;display:flex;flex-wrap:wrap;gap:5px;align-items:center;
+  padding:9px 14px;border-bottom:1px solid var(--line);background:var(--surface)}
+.askctxlab{font-size:10.5px;font-weight:700;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--faint);margin-right:3px}
+.ctxchip{font:inherit;font-size:12px;cursor:pointer;border:1px solid var(--line2);
+  background:var(--paper);color:var(--dim);border-radius:999px;padding:4px 10px}
+.ctxchip:hover{border-color:var(--dim);color:var(--ink)}
+.ctxchip.on{background:var(--green,var(--ink));border-color:transparent;
+  color:var(--paper);font-weight:600}
+.askfoot{flex:none;border-top:1px solid var(--line);padding:11px 13px;
+  display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap}
+/* Attachments: the paperclip, and what is waiting to go with the next ask. */
+.askclip{flex:none;font:inherit;font-size:15px;cursor:pointer;color:var(--dim);
+  background:var(--surface);border:1px solid var(--line);border-radius:10px;
+  padding:8px 11px;line-height:1}
+.askclip:hover{border-color:var(--dim);color:var(--ink)}
+.askfiles{flex-basis:100%;display:flex;flex-wrap:wrap;gap:5px;order:-1}
+.askfiles:empty{display:none}
+.askfile{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;
+  background:var(--surface);border:1px solid var(--line);border-radius:999px;
+  padding:3px 5px 3px 9px;color:var(--dim);max-width:190px}
+.askfile span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.askfile b{font-weight:400;cursor:pointer;padding:0 3px;color:var(--faint)}
+.askfile b:hover{color:var(--ink)}
+.askfile img{width:22px;height:22px;border-radius:4px;object-fit:cover;flex:none}
+.askfoot textarea{flex:1;font:inherit;font-size:14px;padding:9px 12px;resize:none;
+  min-height:40px;max-height:150px;border:1px solid var(--line);border-radius:10px;
+  background:var(--surface);color:var(--ink)}
+.askfoot textarea:focus{outline:2px solid var(--green,var(--ink));outline-offset:1px;
+  border-color:transparent}
+.asksend{flex:none;font:inherit;font-size:13px;font-weight:700;cursor:pointer;
+  border:0;border-radius:10px;padding:10px 15px;
+  background:var(--green,var(--ink));color:var(--paper)}
+.asksend:disabled{opacity:.45;cursor:default}
+/* Which Claude answers. Haiku is the default because this box gets used like
+   a search box; the bigger ones are a choice she makes per chat. */
+.askmodel{flex:none;font:inherit;font-size:12px;font-weight:600;cursor:pointer;
+  color:var(--dim);background:var(--surface);border:1px solid var(--line);
+  border-radius:10px;padding:9px 6px;max-width:88px}
+.askmodel:hover{border-color:var(--dim);color:var(--ink)}
+/* Floating corner buttons — the capture FAB, the tour's "?", the agent pill —
+   live exactly where the panel's own send button lands. They step aside while
+   it is open rather than sitting on top of it. */
+body.asking .fab,body.asking .btour-btn,body.asking .agentbar{display:none}
+
+</style>
 <div class="askscrim" id="askscrim" hidden></div>
 <aside class="askpanel" id="askpanel" hidden aria-label="Ask the brain">
   <div class="askhead">
